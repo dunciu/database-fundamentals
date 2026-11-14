@@ -5,7 +5,7 @@ CREATE DATABASE IF NOT EXISTS auction
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE auction;
 
--- Drop in reverse dependency order so the script can be re-run.
+
 DROP TABLE IF EXISTS feedback;
 DROP TABLE IF EXISTS auction_views;
 DROP TABLE IF EXISTS watches;
@@ -79,8 +79,7 @@ CREATE TABLE watches (
   CONSTRAINT fk_watches_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- View ("view" is an SQL keyword, hence auction_views).
--- userID is NULL when the viewer is not logged in (the 0..1 on the diagram).
+
 CREATE TABLE auction_views (
   viewID     INT UNSIGNED NOT NULL AUTO_INCREMENT,
   auctionID  INT UNSIGNED NOT NULL,
