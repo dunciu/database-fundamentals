@@ -31,6 +31,14 @@
   //       For now, this is hardcoded.
   $has_session = true;
   $watching = false;
+  // All feedback info: seller deets, rating, and whether user can leave feedback
+  require_once("feedback_functions.php");
+  $auction_id_int = (int)$item_id;
+  $seller_id      = get_auction_seller($conn, $auction_id_int);
+  $seller         = $seller_id ? get_user_public($conn, $seller_id) : null;
+  $seller_rating  = $seller_id ? get_user_rating($conn, $seller_id) : null;
+  $can_feedback   = isset($_SESSION['user_id'])
+                 && get_feedback_receiver($conn, $auction_id_int, (int)$_SESSION['user_id']) !== null;
 ?>
 
 
@@ -39,6 +47,18 @@
 <div class="row"> <!-- Row #1 with auction title + watch button -->
   <div class="col-sm-8"> <!-- Left col -->
     <h2 class="my-3"><?php echo($title); ?></h2>
+    <?php if ($seller): ?>
+    <p class="text-muted">
+      Seller:
+      <a href="user_profile.php?user_id=<?= $seller_id ?>"><?= htmlspecialchars($seller['firstName'] . ' ' . $seller['lastName']) ?></a>
+      &middot;
+      <?php if ($seller_rating['numRatings'] > 0): ?>
+                <a href="user_profile.php?user_id=<?= $seller_id ?>"><?= $seller_rating['avgScore'] ?>/5 (<?= $seller_rating['numRatings'] ?> <?= $seller_rating['numRatings'] == 1 ? 'rating' : 'ratings' ?>)</a>
+      <?php else: ?>
+        no ratings yet
+      <?php endif; ?>
+    </p>
+<?php endif; ?>
   </div>
   <div class="col-sm-4 align-self-center"> <!-- Right col -->
 <?php
@@ -72,6 +92,9 @@
 <?php if ($now > $end_time): ?>
      This auction ended <?php echo(date_format($end_time, 'j M H:i')) ?>
      <!-- TODO: Print the result of the auction here? -->
+      <?php if ($can_feedback): ?>
+       <p><a class="btn btn-outline-primary btn-sm" href="feedback_form.php?auction_id=<?= $auction_id_int ?>">Leave feedback</a></p>
+     <?php endif; ?>
 <?php else: ?>
      Auction ends <?php echo(date_format($end_time, 'j M H:i') . $time_remaining) ?></p>  
     <p class="lead">Current bid: £<?php echo(number_format($current_price, 2)) ?></p>

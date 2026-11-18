@@ -19,3 +19,12 @@ function get_auction_winner($conn, $auction_id) {
     $row = $stmt->get_result()->fetch_assoc();
     return $row ? (int)$row['buyerID'] : null;
 }
+
+// Returns user id of selloer for given auction id, or null if non-existent.
+function get_auction_seller($conn, $auction_id) {
+    $stmt = $conn->prepare("SELECT sellerID FROM auctions WHERE auctionID = ?");
+    $stmt->bind_param('i', $auction_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    return $row ? (int)$row['sellerID'] : null;
+}
