@@ -129,3 +129,15 @@ INSERT INTO notifications (userID, auctionID, type, sentAt) VALUES
  (1, 8, 'newBid',       NOW() - INTERVAL 1 DAY),    -- Niamh watches auction 8; Kwame bid
  (2, 8, 'newBid',       NOW() - INTERVAL 12 HOUR),  -- Kwame watches auction 8; Niamh bid
  (1, 8, 'newBid',       NOW() - INTERVAL 1 HOUR);   -- Niamh watches auction 8; Callum bid
+
+INSERT INTO auctions (auctionID, sellerID, categoryID, title, description, itemCondition, startingPrice, reservePrice, startTime, endTime) VALUES
+ (9, 1, 2, 'Hardback fantasy trilogy', 'All three books, dust jackets slightly worn.', 'Good', 20.00, 30.00, NOW() - INTERVAL 7 DAY, NOW() - INTERVAL 1 DAY);
+
+INSERT INTO bids (auctionID, buyerID, amount, bidTime) VALUES
+ (9, 4, 25.00, NOW() - INTERVAL 5 DAY),
+ (9, 2, 35.00, NOW() - INTERVAL 3 DAY);   -- Kwame wins: 35.00 >= reserve 30.00
+
+INSERT INTO notifications (userID, auctionID, type, sentAt) VALUES
+ (4, 9, 'outbid',       NOW() - INTERVAL 3 DAY),   -- Callum outbid by Kwame
+ (2, 9, 'auctionWon',   NOW() - INTERVAL 1 DAY),   -- to the winner, Kwame
+ (1, 9, 'auctionEnded', NOW() - INTERVAL 1 DAY);   -- to the seller, Niamh
