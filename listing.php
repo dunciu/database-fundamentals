@@ -3,16 +3,31 @@
 
 <?php
   // Get info from the URL:
-  $item_id = $_GET['item_id'];
+  $item_id = (int)($_GET['item_id'] ?? 0);
 
-  // TODO: Use item_id to make a query to the database.
+  // Message left by place_bid.php (read and cleared first, so it can't
+  // linger and show up on a different page later).
+  $bid_message = $_SESSION['bid_message'] ?? null;
+  $bid_ok      = $_SESSION['bid_ok'] ?? false;
+  unset($_SESSION['bid_message'], $_SESSION['bid_ok']);
 
-  // DELETEME: For now, using placeholder data.
-  $title = "Placeholder title";
-  $description = "Description blah blah blah";
-  $current_price = 30.50;
-  $num_bids = 1;
-  $end_time = new DateTime('2020-11-02T00:00:00');
+  // Load the auction and its current price from the database.
+  require_once("auction_functions.php");
+  require_once("bid_functions.php");
+  $auction = get_auction($conn, $item_id);
+  if (!$auction) {
+    echo '<div class="container my-4"><p>Auction not found.</p></div>';
+    include_once("footer.php");
+    exit;
+  }
+
+  $title         = $auction['title'];
+  $description   = $auction['description'];
+  $end_time      = new DateTime($auction['endTime']);
+  $price_info    = get_current_price($conn, $item_id);
+  $current_price = (float)$price_info['currentPrice'];
+  $num_bids      = (int)$price_info['numBids'];
+  $min_bid       = get_minimum_bid($price_info);
 
   // TODO: Note: Auctions that have ended may pull a different set of data,
   //       like whether the auction ended in a sale or was cancelled due
@@ -44,9 +59,13 @@
 
 <div class="container">
 
+<?php if ($bid_message !== null): ?>
+  <div class="alert <?= $bid_ok ? 'alert-success' : 'alert-danger' ?> mt-3"><?= htmlspecialchars($bid_message) ?></div>
+<?php endif; ?>
+
 <div class="row"> <!-- Row #1 with auction title + watch button -->
   <div class="col-sm-8"> <!-- Left col -->
-    <h2 class="my-3"><?php echo($title); ?></h2>
+    <h2 class="my-3"><?= htmlspecialchars($title) ?></h2>
     <?php if ($seller): ?>
     <p class="text-muted">
       Seller:
@@ -81,7 +100,7 @@
   <div class="col-sm-8"> <!-- Left col with item info -->
 
     <div class="itemDescription">
-    <?php echo($description); ?>
+    <?= nl2br(htmlspecialchars($description)) ?>
     </div>
 
   </div>
@@ -97,16 +116,22 @@
      <?php endif; ?>
 <?php else: ?>
      Auction ends <?php echo(date_format($end_time, 'j M H:i') . $time_remaining) ?></p>  
-    <p class="lead">Current bid: £<?php echo(number_format($current_price, 2)) ?></p>
+    <p class="lead">
+      <?= $num_bids === 0 ? 'Starting price' : 'Current bid' ?>: £<?= number_format($current_price, 2) ?>
+      <small class="text-muted">(<?= $num_bids ?> <?= $num_bids === 1 ? 'bid' : 'bids' ?>)</small>
+    </p>
 
-    <!-- Bidding form -->
+    <!-- Bidding form: sends auction_id and bid_amount to place_bid.php -->
     <form method="POST" action="place_bid.php">
+      <input type="hidden" name="auction_id" value="<?= $item_id ?>">
       <div class="input-group">
         <div class="input-group-prepend">
           <span class="input-group-text">£</span>
         </div>
-	    <input type="number" class="form-control" id="bid">
+	    <input type="number" class="form-control" id="bid" name="bid_amount"
+	           step="0.01" min="<?= number_format($min_bid, 2, '.', '') ?>" required>
       </div>
+      <small class="form-text text-muted">Minimum bid: £<?= number_format($min_bid, 2) ?></small>
       <button type="submit" class="btn btn-primary form-control">Place bid</button>
     </form>
 <?php endif ?>

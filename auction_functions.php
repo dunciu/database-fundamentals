@@ -28,3 +28,14 @@ function get_auction_seller($conn, $auction_id) {
     $row = $stmt->get_result()->fetch_assoc();
     return $row ? (int)$row['sellerID'] : null;
 }
+
+// Returns one auction's details for the listing page, or null if non-existent.
+function get_auction($conn, $auction_id) {
+    $stmt = $conn->prepare(
+        "SELECT auctionID, sellerID, title, description, itemCondition,
+                startingPrice, startTime, endTime
+         FROM auctions WHERE auctionID = ?");
+    $stmt->bind_param('i', $auction_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
