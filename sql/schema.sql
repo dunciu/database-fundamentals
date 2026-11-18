@@ -1,11 +1,11 @@
--- COMP0178 Database schema
+-- COMP0178 full schema (core + optional)
 
 
 CREATE DATABASE IF NOT EXISTS auction
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE auction;
 
-
+DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS feedback;
 DROP TABLE IF EXISTS auction_views;
 DROP TABLE IF EXISTS watches;
@@ -44,14 +44,14 @@ CREATE TABLE auctions (
   description    TEXT          NOT NULL,
   itemCondition  ENUM('New', 'Like new', 'Good', 'Fair', 'Poor') NOT NULL,
   startingPrice  DECIMAL(10,2) NOT NULL,
-  reservePrice   DECIMAL(10,2) NULL,          -- NULL = no reserve
+  reservePrice   DECIMAL(10,2) NOT NULL,
   startTime      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   endTime        DATETIME      NOT NULL,
   PRIMARY KEY (auctionID),
   CONSTRAINT fk_auctions_seller   FOREIGN KEY (sellerID)   REFERENCES users (userID),
   CONSTRAINT fk_auctions_category FOREIGN KEY (categoryID) REFERENCES categories (categoryID),
   CONSTRAINT chk_auctions_start   CHECK (startingPrice > 0),
-  CONSTRAINT chk_auctions_reserve CHECK (reservePrice IS NULL OR reservePrice >= startingPrice),
+  CONSTRAINT chk_auctions_reserve CHECK (reservePrice >= startingPrice),
   CONSTRAINT chk_auctions_times   CHECK (endTime > startTime),
   KEY idx_auctions_endTime (endTime)
 ) ENGINE=InnoDB;
@@ -106,4 +106,16 @@ CREATE TABLE feedback (
   CONSTRAINT fk_feedback_receiver FOREIGN KEY (receiverID) REFERENCES users (userID),
   CONSTRAINT chk_feedback_score   CHECK (score BETWEEN 1 AND 5),
   CONSTRAINT chk_feedback_people  CHECK (giverID <> receiverID)
+) ENGINE=InnoDB;
+
+
+CREATE TABLE notifications (
+  notificationID  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  userID          INT UNSIGNED NOT NULL,
+  auctionID       INT UNSIGNED NOT NULL,
+  type            ENUM('auctionWon', 'auctionEnded', 'newBid', 'outbid') NOT NULL,
+  sentAt          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (notificationID),
+  CONSTRAINT fk_notifications_user    FOREIGN KEY (userID)    REFERENCES users (userID),
+  CONSTRAINT fk_notifications_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID)
 ) ENGINE=InnoDB;
