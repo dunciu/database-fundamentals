@@ -55,10 +55,12 @@ $conn->begin_transaction();
 // FOR UPDATE locks this auction's row. Anyone else bidding on the same
 // auction waits here until we commit or roll back, so two people can't
 // both "beat" the same old price at the same moment.
-// The open/closed check uses MySQL's NOW(), the same clock the data uses.
+// The open/closed check uses MySQL's NOW(), the same clock the data uses,
+// and also requires status = 'active' (it becomes 'sold' or 'unsold' once
+// the auction has been closed).
 $stmt = $conn->prepare(
     "SELECT sellerID, startingPrice,
-            (NOW() >= startTime AND NOW() < endTime) AS isOpen
+            (status = 'active' AND NOW() >= startTime AND NOW() < endTime) AS isOpen
      FROM auctions
      WHERE auctionID = ?
      FOR UPDATE");
@@ -92,24 +94,25 @@ if ($top === null && $amount < (float)$auction['startingPrice']) {
 $stmt = $conn->prepare("INSERT INTO bids (auctionID, buyerID, amount) VALUES (?, ?, ?)");
 $stmt->bind_param('iid', $auction_id, $user_id, $amount);
 $stmt->execute();
+$bid_id = (int)$conn->insert_id;   // the new bid's ID, stored on its notifications
 
 // Tell whoever was winning that they've been outbid
 // (unless they're just raising their own bid).
 if ($top !== null && (int)$top['buyerID'] !== $user_id) {
     $previous_leader = (int)$top['buyerID'];
     $stmt = $conn->prepare(
-        "INSERT INTO notifications (userID, auctionID, type) VALUES (?, ?, 'outbid')");
-    $stmt->bind_param('ii', $previous_leader, $auction_id);
+        "INSERT INTO notifications (userID, auctionID, type, bidID) VALUES (?, ?, 'outbid', ?)");
+    $stmt->bind_param('iii', $previous_leader, $auction_id, $bid_id);
     $stmt->execute();
 }
 
 // Tell everyone watching this auction, except the bidder, that there's a new bid.
 $stmt = $conn->prepare(
-    "INSERT INTO notifications (userID, auctionID, type)
-     SELECT buyerID, auctionID, 'newBid'
+    "INSERT INTO notifications (userID, auctionID, type, bidID)
+     SELECT buyerID, auctionID, 'newBid', ?
      FROM watches
      WHERE auctionID = ? AND buyerID <> ?");
-$stmt->bind_param('ii', $auction_id, $user_id);
+$stmt->bind_param('iii', $bid_id, $auction_id, $user_id);
 $stmt->execute();
 
 $conn->commit();
