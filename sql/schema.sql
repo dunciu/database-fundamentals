@@ -5,6 +5,7 @@ CREATE DATABASE IF NOT EXISTS auction
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE auction;
 
+SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS feedback;
 DROP TABLE IF EXISTS auction_views;
@@ -13,7 +14,7 @@ DROP TABLE IF EXISTS bids;
 DROP TABLE IF EXISTS auctions;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS users;
-
+SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE users (
   userID        INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -47,12 +48,15 @@ CREATE TABLE auctions (
   reservePrice   DECIMAL(10,2) NOT NULL,
   startTime      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   endTime        DATETIME      NOT NULL,
+  status         ENUM('active', 'sold', 'unsold') NOT NULL DEFAULT 'active',
+  winningBidID   INT UNSIGNED  NULL,
   PRIMARY KEY (auctionID),
   CONSTRAINT fk_auctions_seller   FOREIGN KEY (sellerID)   REFERENCES users (userID),
   CONSTRAINT fk_auctions_category FOREIGN KEY (categoryID) REFERENCES categories (categoryID),
   CONSTRAINT chk_auctions_start   CHECK (startingPrice > 0),
   CONSTRAINT chk_auctions_reserve CHECK (reservePrice >= startingPrice),
   CONSTRAINT chk_auctions_times   CHECK (endTime > startTime),
+  CONSTRAINT chk_auctions_winner  CHECK ((status = 'sold') = (winningBidID IS NOT NULL)),
   KEY idx_auctions_endTime (endTime)
 ) ENGINE=InnoDB;
 
@@ -66,6 +70,7 @@ CREATE TABLE bids (
   CONSTRAINT fk_bids_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID),
   CONSTRAINT fk_bids_buyer   FOREIGN KEY (buyerID)   REFERENCES users (userID),
   CONSTRAINT chk_bids_amount CHECK (amount > 0),
+  UNIQUE KEY uq_bids_bid_auction (bidID, auctionID),
   KEY idx_bids_auction_amount (auctionID, amount)
 ) ENGINE=InnoDB;
 
@@ -114,8 +119,14 @@ CREATE TABLE notifications (
   userID          INT UNSIGNED NOT NULL,
   auctionID       INT UNSIGNED NOT NULL,
   type            ENUM('auctionWon', 'auctionEnded', 'newBid', 'outbid') NOT NULL,
+  bidID           INT UNSIGNED NULL,
   sentAt          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (notificationID),
   CONSTRAINT fk_notifications_user    FOREIGN KEY (userID)    REFERENCES users (userID),
-  CONSTRAINT fk_notifications_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID)
+  CONSTRAINT fk_notifications_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID),
+  CONSTRAINT fk_notifications_bid     FOREIGN KEY (bidID, auctionID) REFERENCES bids (bidID, auctionID)
 ) ENGINE=InnoDB;
+
+ALTER TABLE auctions
+  ADD CONSTRAINT fk_auctions_winning_bid
+  FOREIGN KEY (winningBidID, auctionID) REFERENCES bids (bidID, auctionID);
