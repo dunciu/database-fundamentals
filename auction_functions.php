@@ -1,18 +1,13 @@
 <?php
 // auction_functions.php: implemenation of general auction queries.
 require_once 'db.php';
-// Returns the userID of winner bidder, or null if auction unconcluded,
-// reserve not met, no bids .
-// Tied bids go to whoever bid first.
+// Returns the winning buyer's userID, or null if the auction ongoingg
+// The winner is decided when the auction is closed and stored in winningBidID.
 function get_auction_winner($conn, $auction_id) {
     $sql = "SELECT b.buyerID
-            FROM bids b
-            JOIN auctions a ON a.auctionID = b.auctionID
-            WHERE b.auctionID = ?
-              AND a.endTime < NOW()
-              AND b.amount >= a.reservePrice
-            ORDER BY b.amount DESC, b.bidTime ASC
-            LIMIT 1";
+            FROM auctions a
+            JOIN bids b ON b.bidID = a.winningBidID
+            WHERE a.auctionID = ? AND a.status = 'sold'";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('i', $auction_id);
     $stmt->execute();
