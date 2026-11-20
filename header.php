@@ -1,11 +1,11 @@
 <?php
-  // FIXME: At the moment, I've allowed these values to be set manually.
-  // But eventually, with a database, these should be set automatically
-  // ONLY after the user's login credentials have been verified via a 
-  // database query.
-  session_start();
-  $_SESSION['logged_in'] = false;
-  $_SESSION['account_type'] = 'seller';
+  // Start the session once per request (login and registration may already have started it).
+  if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+  }
+  $logged_in = !empty($_SESSION['logged_in']);
+  $is_buyer  = $logged_in && !empty($_SESSION['is_buyer']);
+  $is_seller = $logged_in && !empty($_SESSION['is_seller']);
 ?>
 
 
@@ -35,13 +35,14 @@
     <li class="nav-item">
     
 <?php
-  // Displays either login or logout on the right, depending on user's
-  // current status (session).
-  if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] == true) {
-    echo '<a class="nav-link" href="logout.php">Logout</a>';
+    if ($logged_in) {
+    echo '<a class="nav-link d-inline" href="user_profile.php?user_id=' . (int)$_SESSION['user_id'] . '">Hi, '
+       . htmlspecialchars($_SESSION['first_name'] ?? '') . '</a>';
+    echo '<a class="nav-link d-inline ml-3" href="logout.php">Logout</a>';
   }
-  else {
-    echo '<button type="button" class="btn nav-link" data-toggle="modal" data-target="#loginModal">Login</button>';
+    else {
+    echo '<button type="button" class="btn nav-link d-inline" data-toggle="modal" data-target="#loginModal">Login</button>';
+    echo '<a class="nav-link d-inline ml-3" href="register.php">Register</a>';
   }
 ?>
 
@@ -54,7 +55,7 @@
       <a class="nav-link" href="browse.php">Browse</a>
     </li>
 <?php
-  if (isset($_SESSION['account_type']) && $_SESSION['account_type'] == 'buyer') {
+  if ($is_buyer) {
   echo('
 	<li class="nav-item mx-1">
       <a class="nav-link" href="mybids.php">My Bids</a>
@@ -63,7 +64,7 @@
       <a class="nav-link" href="recommendations.php">Recommended</a>
     </li>');
   }
-  if (isset($_SESSION['account_type']) && $_SESSION['account_type'] == 'seller') {
+  if ($is_seller) {
   echo('
 	<li class="nav-item mx-1">
       <a class="nav-link" href="mylistings.php">My Listings</a>
@@ -90,12 +91,12 @@
       <div class="modal-body">
         <form method="POST" action="login_result.php">
           <div class="form-group">
-            <label for="email">Email</label>
-            <input type="text" class="form-control" id="email" placeholder="Email">
+            <label for="loginEmail">Email</label>
+            <input type="email" class="form-control" id="loginEmail" name="email" placeholder="Email" required>
           </div>
           <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" class="form-control" id="password" placeholder="Password">
+            <label for="loginPassword">Password</label>
+            <input type="password" class="form-control" id="loginPassword" name="password" placeholder="Password" required>
           </div>
           <button type="submit" class="btn btn-primary form-control">Sign in</button>
         </form>
