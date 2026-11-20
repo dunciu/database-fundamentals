@@ -3,41 +3,50 @@
 <div class="container">
 <h2 class="my-3">Register new account</h2>
 
-<!-- Create auction form -->
 <form method="POST" action="process_registration.php">
   <div class="form-group row">
-    <label for="accountType" class="col-sm-2 col-form-label text-right">Registering as a:</label>
-	<div class="col-sm-10">
-	  <div class="form-check form-check-inline">
-        <input class="form-check-input" type="radio" name="accountType" id="accountBuyer" value="buyer" checked>
-        <label class="form-check-label" for="accountBuyer">Buyer</label>
+    <label class="col-sm-2 col-form-label text-right">Registering as a:</label>
+    <div class="col-sm-10">
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" name="isBuyer" id="isBuyer" value="1" checked>
+        <label class="form-check-label" for="isBuyer">Buyer</label>
       </div>
       <div class="form-check form-check-inline">
-        <input class="form-check-input" type="radio" name="accountType" id="accountSeller" value="seller">
-        <label class="form-check-label" for="accountSeller">Seller</label>
+        <input class="form-check-input" type="checkbox" name="isSeller" id="isSeller" value="1">
+        <label class="form-check-label" for="isSeller">Seller</label>
       </div>
-      <small id="accountTypeHelp" class="form-text-inline text-muted"><span class="text-danger">* Required.</span></small>
-	</div>
+      <small class="form-text text-muted"><span class="text-danger">* Choose at least one.</span> You can be both.</small>
+    </div>
+  </div>
+  <div class="form-group row">
+    <label for="firstName" class="col-sm-2 col-form-label text-right">First name</label>
+    <div class="col-sm-10">
+      <input type="text" class="form-control" id="firstName" name="firstName" maxlength="50" required>
+    </div>
+  </div>
+  <div class="form-group row">
+    <label for="lastName" class="col-sm-2 col-form-label text-right">Last name</label>
+    <div class="col-sm-10">
+      <input type="text" class="form-control" id="lastName" name="lastName" maxlength="50" required>
+    </div>
   </div>
   <div class="form-group row">
     <label for="email" class="col-sm-2 col-form-label text-right">Email</label>
-	<div class="col-sm-10">
-      <input type="text" class="form-control" id="email" placeholder="Email">
-      <small id="emailHelp" class="form-text text-muted"><span class="text-danger">* Required.</span></small>
-	</div>
+    <div class="col-sm-10">
+      <input type="email" class="form-control" id="email" name="email" maxlength="255" required>
+    </div>
   </div>
   <div class="form-group row">
     <label for="password" class="col-sm-2 col-form-label text-right">Password</label>
     <div class="col-sm-10">
-      <input type="password" class="form-control" id="password" placeholder="Password">
-      <small id="passwordHelp" class="form-text text-muted"><span class="text-danger">* Required.</span></small>
+      <input type="password" class="form-control" id="password" name="password" minlength="8" required>
+      <small class="form-text text-muted">At least 8 characters.</small>
     </div>
   </div>
   <div class="form-group row">
     <label for="passwordConfirmation" class="col-sm-2 col-form-label text-right">Repeat password</label>
     <div class="col-sm-10">
-      <input type="password" class="form-control" id="passwordConfirmation" placeholder="Enter password again">
-      <small id="passwordConfirmationHelp" class="form-text text-muted"><span class="text-danger">* Required.</span></small>
+      <input type="password" class="form-control" id="passwordConfirmation" name="passwordConfirmation" minlength="8" required>
     </div>
   </div>
   <div class="form-group row">
@@ -45,8 +54,7 @@
   </div>
 </form>
 
-<div class="text-center">Already have an account? <a href="" data-toggle="modal" data-target="#loginModal">Login</a>
-
+<div class="text-center">Already have an account? <a href="" data-toggle="modal" data-target="#loginModal">Login</a></div>
 </div>
 
 <?php include_once("footer.php")?>
