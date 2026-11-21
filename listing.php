@@ -26,11 +26,19 @@
     $time_remaining = ' (in ' . display_time_remaining($time_to_end) . ')';
   }
   
-  // TODO: If the user has a session, use it to make a query to the database
-  //       to determine if the user is already watching this item.
-  //       For now, this is hardcoded.
-  $has_session = true;
-  $watching = false;
+  // You have to login to add auction to watchlist
+  // check whether it's already being watched
+ require_once("db.php");
+  $has_session = $is_buyer;
+  $watching    = false;
+  if ($has_session) {
+    $stmt = $conn->prepare("SELECT 1 FROM watches WHERE buyerID = ? AND auctionID = ?");
+    $watch_user    = (int)$_SESSION['user_id'];
+    $watch_auction = (int)$item_id;
+    $stmt->bind_param('ii', $watch_user, $watch_auction);
+    $stmt->execute();
+    $watching = $stmt->get_result()->num_rows > 0;
+  }
   // All feedback info: seller deets, rating, and whether user can leave feedback
   require_once("feedback_functions.php");
   $auction_id_int = (int)$item_id;
@@ -64,7 +72,7 @@
 <?php
   /* The following watchlist functionality uses JavaScript, but could
      just as easily use PHP as in other places in the code */
-  if ($now < $end_time):
+   if ($now < $end_time && $has_session):
 ?>
     <div id="watch_nowatch" <?php if ($has_session && $watching) echo('style="display: none"');?> >
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addToWatchlist()">+ Add to watchlist</button>
