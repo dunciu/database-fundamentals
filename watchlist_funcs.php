@@ -1,27 +1,36 @@
- <?php
+<?php
+// watchlist_funcs.php: called in the background by the watch / unwatch buttons on listing.php.
+// Replies with "success" or "failure".
+session_start();
+require_once 'db.php';
 
 if (!isset($_POST['functionname']) || !isset($_POST['arguments'])) {
   return;
 }
 
-// Extract arguments from the POST variables:
-$item_id = $_POST['arguments'];
+$res = "failure";
+$auction_id = (int)($_POST['arguments'][0] ?? 0);   // the page sends the auction ID as [id]
 
-if ($_POST['functionname'] == "add_to_watchlist") {
-  // TODO: Update database and return success/failure.
+// Only logged-in buyers can watch auctions
+if (!empty($_SESSION['logged_in']) && !empty($_SESSION['is_buyer']) && $auction_id > 0) {
+  $user_id = (int)$_SESSION['user_id'];
 
-  $res = "success";
+  if ($_POST['functionname'] == "add_to_watchlist") {
+    // Only active auctions can be watched. INSERT IGNORE means watching something
+    // you already watch does nothing (the primary key is buyerID + auctionID).
+    $stmt = $conn->prepare(
+      "INSERT IGNORE INTO watches (buyerID, auctionID)
+       SELECT ?, auctionID FROM auctions WHERE auctionID = ? AND status = 'active'");
+    $stmt->bind_param('ii', $user_id, $auction_id);
+    $stmt->execute();
+    $res = "success";
+  }
+  else if ($_POST['functionname'] == "remove_from_watchlist") {
+    $stmt = $conn->prepare("DELETE FROM watches WHERE buyerID = ? AND auctionID = ?");
+    $stmt->bind_param('ii', $user_id, $auction_id);
+    $stmt->execute();
+    $res = "success";
+  }
 }
-else if ($_POST['functionname'] == "remove_from_watchlist") {
-  // TODO: Update database and return success/failure.
 
-  $res = "success";
-}
-
-// Note: Echoing from this PHP function will return the value as a string.
-// If multiple echo's in this file exist, they will concatenate together,
-// so be careful. You can also return JSON objects (in string form) using
-// echo json_encode($res).
 echo $res;
-
-?>
