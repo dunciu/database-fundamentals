@@ -25,13 +25,15 @@ function display_time_remaining($interval) {
 // This function prints an HTML <li> element containing an auction listing
 function print_listing_li($item_id, $title, $desc, $price, $num_bids, $end_time)
 {
-  // Truncate long descriptions
-  if (strlen($desc) > 250) {
-    $desc_shortened = substr($desc, 0, 250) . '...';
+    // Prevents modifying pages from DB entries 
+  if (mb_strlen($desc) > 250) {
+    $desc_shortened = mb_substr($desc, 0, 250) . '...';
   }
   else {
     $desc_shortened = $desc;
   }
+  $desc_shortened = htmlspecialchars($desc_shortened);
+  $title = htmlspecialchars($title);
   
   // Fix language of bid vs. bids
   if ($num_bids == 1) {

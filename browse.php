@@ -1,47 +1,74 @@
 <?php include_once("header.php")?>
+<?php require_once("db.php")?>
 <?php require("utilities.php")?>
+
+<?php
+  // Read the search options from the URL. 
+  $keyword    = trim($_GET['keyword'] ?? '');
+  $category   = $_GET['cat'] ?? 'all';
+  $category   = ($category === 'all') ? 'all' : (int)$category;
+  $ordering   = $_GET['order_by'] ?? 'pricelow';
+  $show_ended = !empty($_GET['ended']);
+  $curr_page  = max(1, (int)($_GET['page'] ?? 1));
+  $results_per_page = 10;
+
+  // ORDER BY the sort must come from this fixed list, not URL
+  $orderings = [
+    'pricelow'  => 'currentPrice ASC, a.endTime ASC',
+    'pricehigh' => 'currentPrice DESC, a.endTime ASC',
+    'date'      => 'a.endTime ASC',
+    'newest'    => 'a.startTime DESC',
+  ];
+  if (!isset($orderings[$ordering])) {
+    $ordering = 'pricelow';
+  }
+
+  // Categories for the dropdown
+  $categories = $conn->query("SELECT categoryID, name FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+?>
 
 <div class="container">
 
 <h2 class="my-3">Browse listings</h2>
 
 <div id="searchSpecs">
-<!-- When this form is submitted, this PHP page is what processes it.
-     Search/sort specs are passed to this page through parameters in the URL
-     (GET method of passing data to a page). -->
 <form method="get" action="browse.php">
   <div class="row">
     <div class="col-md-5 pr-0">
       <div class="form-group">
         <label for="keyword" class="sr-only">Search keyword:</label>
-	    <div class="input-group">
+        <div class="input-group">
           <div class="input-group-prepend">
             <span class="input-group-text bg-transparent pr-0 text-muted">
               <i class="fa fa-search"></i>
             </span>
           </div>
-          <input type="text" class="form-control border-left-0" id="keyword" placeholder="Search for anything">
+          <input type="text" class="form-control border-left-0" id="keyword" name="keyword"
+                 placeholder="Search for anything" value="<?= htmlspecialchars($keyword) ?>">
         </div>
       </div>
     </div>
     <div class="col-md-3 pr-0">
       <div class="form-group">
         <label for="cat" class="sr-only">Search within:</label>
-        <select class="form-control" id="cat">
-          <option selected value="all">All categories</option>
-          <option value="fill">Fill me in</option>
-          <option value="with">with options</option>
-          <option value="populated">populated from a database?</option>
+        <select class="form-control" id="cat" name="cat">
+          <option value="all">All categories</option>
+          <?php foreach ($categories as $c): ?>
+            <option value="<?= $c['categoryID'] ?>" <?= $category === (int)$c['categoryID'] ? 'selected' : '' ?>>
+              <?= htmlspecialchars($c['name']) ?>
+            </option>
+          <?php endforeach; ?>
         </select>
       </div>
     </div>
     <div class="col-md-3 pr-0">
       <div class="form-inline">
         <label class="mx-2" for="order_by">Sort by:</label>
-        <select class="form-control" id="order_by">
-          <option selected value="pricelow">Price (low to high)</option>
-          <option value="pricehigh">Price (high to low)</option>
-          <option value="date">Soonest expiry</option>
+        <select class="form-control" id="order_by" name="order_by">
+          <option value="pricelow"  <?= $ordering === 'pricelow'  ? 'selected' : '' ?>>Price (low to high)</option>
+          <option value="pricehigh" <?= $ordering === 'pricehigh' ? 'selected' : '' ?>>Price (high to low)</option>
+          <option value="date"      <?= $ordering === 'date'      ? 'selected' : '' ?>>Soonest expiry</option>
+          <option value="newest"    <?= $ordering === 'newest'    ? 'selected' : '' ?>>Newly listed</option>
         </select>
       </div>
     </div>
@@ -49,150 +76,132 @@
       <button type="submit" class="btn btn-primary">Search</button>
     </div>
   </div>
+  <div class="form-check mb-2">
+    <input class="form-check-input" type="checkbox" id="ended" name="ended" value="1" <?= $show_ended ? 'checked' : '' ?>>
+    <label class="form-check-label" for="ended">Include ended auctions</label>
+  </div>
 </form>
 </div> <!-- end search specs bar -->
 
-
 </div>
 
 <?php
-  // Retrieve these from the URL
-  if (!isset($_GET['keyword'])) {
-    // TODO: Define behavior if a keyword has not been specified.
+  
+  $where  = [];
+  $types  = '';
+  $params = [];
+
+  if (!$show_ended) {
+    $where[] = 'a.endTime > NOW()';               // running auctions only
   }
-  else {
-    $keyword = $_GET['keyword'];
+  if ($category !== 'all') {
+    $where[] = 'a.categoryID = ?';
+    $types  .= 'i';
+    $params[] = $category;
   }
 
-  if (!isset($_GET['cat'])) {
-    // TODO: Define behavior if a category has not been specified.
+  $words = array_slice(preg_split('/\s+/', $keyword, -1, PREG_SPLIT_NO_EMPTY), 0, 5);
+  foreach ($words as $word) {
+    $like = '%' . addcslashes($word, '%_\\') . '%';   // treat % and _ as ordinary characters
+    $where[] = '(a.title LIKE ? OR a.description LIKE ?)';
+    $types  .= 'ss';
+    array_push($params, $like, $like);
   }
-  else {
-    $category = $_GET['cat'];
-  }
-  
-  if (!isset($_GET['order_by'])) {
-    // TODO: Define behavior if an order_by value has not been specified.
-  }
-  else {
-    $ordering = $_GET['order_by'];
-  }
-  
-  if (!isset($_GET['page'])) {
-    $curr_page = 1;
-  }
-  else {
-    $curr_page = $_GET['page'];
-  }
+  $where_sql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
-  /* TODO: Use above values to construct a query. Use this query to 
-     retrieve data from the database. (If there is no form data entered,
-     decide on appropriate default value/default query to make. */
+
+  $stmt = $conn->prepare("SELECT COUNT(*) AS n FROM auctions a $where_sql");
+  if ($types !== '') {
+    $stmt->bind_param($types, ...$params);
+  }
+  $stmt->execute();
+  $num_results = (int)$stmt->get_result()->fetch_assoc()['n'];
+  $max_page    = max(1, (int)ceil($num_results / $results_per_page));
+  $curr_page   = min($curr_page, $max_page);
+  $offset      = ($curr_page - 1) * $results_per_page;
+
   
-  /* For the purposes of pagination, it would also be helpful to know the
-     total number of results that satisfy the above query */
-  $num_results = 96; // TODO: Calculate me for real
-  $results_per_page = 10;
-  $max_page = ceil($num_results / $results_per_page);
+  $stmt = $conn->prepare(
+    "SELECT a.auctionID, a.title, a.description, a.endTime,
+            COALESCE(MAX(b.amount), a.startingPrice) AS currentPrice,
+            COUNT(b.bidID) AS numBids
+     FROM auctions a
+     LEFT JOIN bids b ON b.auctionID = a.auctionID
+     $where_sql
+     GROUP BY a.auctionID
+     ORDER BY {$orderings[$ordering]}
+     LIMIT ? OFFSET ?");
+  $page_params = array_merge($params, [$results_per_page, $offset]);
+  $stmt->bind_param($types . 'ii', ...$page_params);
+  $stmt->execute();
+  $results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+
+  $link_params = array_filter([
+    'keyword'  => $keyword,
+    'cat'      => ($category === 'all') ? null : $category,
+    'order_by' => $ordering,
+    'ended'    => $show_ended ? 1 : null,
+  ], fn($v) => $v !== null && $v !== '');
+  $querystring = $link_params ? htmlspecialchars(http_build_query($link_params)) . '&amp;' : '';
 ?>
 
-<div class="container mt-5">
+<div class="container mt-4">
 
-<!-- TODO: If result set is empty, print an informative message. Otherwise... -->
+<?php if ($num_results === 0): ?>
+  <p>No auctions match your search. Try different words, another category, or tick <em>Include ended auctions</em>.</p>
+<?php else: ?>
+  <p class="text-muted"><?= $num_results ?> <?= $num_results === 1 ? 'auction' : 'auctions' ?> found</p>
 
-<ul class="list-group">
-
-<!-- TODO: Use a while loop to print a list item for each auction listing
-     retrieved from the query -->
-
-<?php
-  // Demonstration of what listings will look like using dummy data.
-  $item_id = "87021";
-  $title = "Dummy title";
-  $description = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget rutrum ipsum. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Phasellus feugiat, ipsum vel egestas elementum, sem mi vestibulum eros, et facilisis dui nisi eget metus. In non elit felis. Ut lacus sem, pulvinar ultricies pretium sed, viverra ac sapien. Vivamus condimentum aliquam rutrum. Phasellus iaculis faucibus pellentesque. Sed sem urna, maximus vitae cursus id, malesuada nec lectus. Vestibulum scelerisque vulputate elit ut laoreet. Praesent vitae orci sed metus varius posuere sagittis non mi.";
-  $current_price = 30;
-  $num_bids = 1;
-  $end_date = new DateTime('2020-09-16T11:00:00');
-  
-  // This uses a function defined in utilities.php
-  print_listing_li($item_id, $title, $description, $current_price, $num_bids, $end_date);
-  
-  $item_id = "516";
-  $title = "Different title";
-  $description = "Very short description.";
-  $current_price = 13.50;
-  $num_bids = 3;
-  $end_date = new DateTime('2020-11-02T00:00:00');
-  
-  print_listing_li($item_id, $title, $description, $current_price, $num_bids, $end_date);
-?>
-
-</ul>
-
-<!-- Pagination for results listings -->
-<nav aria-label="Search results pages" class="mt-5">
-  <ul class="pagination justify-content-center">
-  
-<?php
-
-  // Copy any currently-set GET variables to the URL.
-  $querystring = "";
-  foreach ($_GET as $key => $value) {
-    if ($key != "page") {
-      $querystring .= "$key=$value&amp;";
+  <ul class="list-group">
+  <?php
+    foreach ($results as $r) {
+      print_listing_li($r['auctionID'], $r['title'], $r['description'],
+                       $r['currentPrice'], $r['numBids'], new DateTime($r['endTime']));
     }
-  }
-  
-  $high_page_boost = max(3 - $curr_page, 0);
-  $low_page_boost = max(2 - ($max_page - $curr_page), 0);
-  $low_page = max(1, $curr_page - 2 - $low_page_boost);
-  $high_page = min($max_page, $curr_page + 2 + $high_page_boost);
-  
-  if ($curr_page != 1) {
-    echo('
-    <li class="page-item">
-      <a class="page-link" href="browse.php?' . $querystring . 'page=' . ($curr_page - 1) . '" aria-label="Previous">
-        <span aria-hidden="true"><i class="fa fa-arrow-left"></i></span>
-        <span class="sr-only">Previous</span>
-      </a>
-    </li>');
-  }
-    
-  for ($i = $low_page; $i <= $high_page; $i++) {
-    if ($i == $curr_page) {
-      // Highlight the link
-      echo('
-    <li class="page-item active">');
-    }
-    else {
-      // Non-highlighted link
-      echo('
-    <li class="page-item">');
-    }
-    
-    // Do this in any case
-    echo('
-      <a class="page-link" href="browse.php?' . $querystring . 'page=' . $i . '">' . $i . '</a>
-    </li>');
-  }
-  
-  if ($curr_page != $max_page) {
-    echo('
-    <li class="page-item">
-      <a class="page-link" href="browse.php?' . $querystring . 'page=' . ($curr_page + 1) . '" aria-label="Next">
-        <span aria-hidden="true"><i class="fa fa-arrow-right"></i></span>
-        <span class="sr-only">Next</span>
-      </a>
-    </li>');
-  }
-?>
-
+  ?>
   </ul>
-</nav>
 
+  
+  <nav aria-label="Search results pages" class="mt-5">
+    <ul class="pagination justify-content-center">
+  <?php
+    $high_page_boost = max(3 - $curr_page, 0);
+    $low_page_boost  = max(2 - ($max_page - $curr_page), 0);
+    $low_page  = max(1, $curr_page - 2 - $low_page_boost);
+    $high_page = min($max_page, $curr_page + 2 + $high_page_boost);
+
+    if ($curr_page != 1) {
+      echo('
+      <li class="page-item">
+        <a class="page-link" href="browse.php?' . $querystring . 'page=' . ($curr_page - 1) . '" aria-label="Previous">
+          <span aria-hidden="true"><i class="fa fa-arrow-left"></i></span>
+          <span class="sr-only">Previous</span>
+        </a>
+      </li>');
+    }
+
+    for ($i = $low_page; $i <= $high_page; $i++) {
+      echo('
+      <li class="page-item' . ($i == $curr_page ? ' active' : '') . '">
+        <a class="page-link" href="browse.php?' . $querystring . 'page=' . $i . '">' . $i . '</a>
+      </li>');
+    }
+
+    if ($curr_page != $max_page) {
+      echo('
+      <li class="page-item">
+        <a class="page-link" href="browse.php?' . $querystring . 'page=' . ($curr_page + 1) . '" aria-label="Next">
+          <span aria-hidden="true"><i class="fa fa-arrow-right"></i></span>
+          <span class="sr-only">Next</span>
+        </a>
+      </li>');
+    }
+  ?>
+    </ul>
+  </nav>
+<?php endif; ?>
 
 </div>
-
-
 
 <?php include_once("footer.php")?>
