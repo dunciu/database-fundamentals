@@ -4,6 +4,7 @@
 
 <?php
 require_once("db.php");
+require_once("utilities.php");
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('<div class="text-center text-danger">Invalid request.</div>');
@@ -29,10 +30,6 @@ if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
 
 function post_value($key) {
     return trim($_POST[$key] ?? '');
-}
-
-function is_money_value($value) {
-    return preg_match('/^\d+(?:\.\d{1,2})?$/D', $value) === 1;
 }
 
 //$seller_id = (int)$_SESSION['user_id']; original code, commented for testing

@@ -1,5 +1,18 @@
 <?php
 
+function is_money_value($value) {
+  return preg_match('/^\d+(?:\.\d{1,2})?$/D', trim((string)$value)) === 1;
+}
+
+function is_valid_bid_amount($value, $minimum_price) {
+  if (!is_money_value($value)) {
+    return false;
+  }
+
+  $amount = filter_var(trim((string)$value), FILTER_VALIDATE_FLOAT);
+  return $amount !== false && $amount >= (float)$minimum_price;
+}
+
 // display_time_remaining:
 // Helper function to help figure out what time to display
 function display_time_remaining($interval) {

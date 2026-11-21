@@ -1,23 +1,75 @@
 <?php include_once("header.php")?>
 <?php require("utilities.php")?>
+<?php require_once("db.php")?>
 
 <?php
   // Get info from the URL:
-  $item_id = $_GET['item_id'];
+  $item_id = filter_input(INPUT_GET, 'item_id', FILTER_VALIDATE_INT);
+  if (!$item_id || $item_id < 1) {
+    http_response_code(404);
+    echo '<div class="container"><p class="my-4">Auction not found.</p></div>';
+    include_once("footer.php");
+    exit;
+  }
 
-  // TODO: Use item_id to make a query to the database.
+  // Load the auction and its current bid summary in one query.
+  $stmt = $conn->prepare(
+    "SELECT a.auctionID, a.title, a.description, a.startingPrice,
+            a.endTime, a.status, a.winningBidID,
+            COALESCE(MAX(b.amount), a.startingPrice) AS currentPrice,
+            COUNT(b.bidID) AS numBids,
+            wb.amount AS winningAmount,
+            wu.firstName AS winnerFirstName,
+            wu.lastName AS winnerLastName
+     FROM auctions a
+     LEFT JOIN bids b ON b.auctionID = a.auctionID
+     LEFT JOIN bids wb ON wb.bidID = a.winningBidID
+                       AND wb.auctionID = a.auctionID
+     LEFT JOIN users wu ON wu.userID = wb.buyerID
+     WHERE a.auctionID = ?
+     GROUP BY a.auctionID, a.title, a.description, a.startingPrice,
+              a.endTime, a.status, a.winningBidID, wb.amount,
+              wu.firstName, wu.lastName");
+  $stmt->bind_param('i', $item_id);
+  $stmt->execute();
+  $auction = $stmt->get_result()->fetch_assoc();
 
-  // DELETEME: For now, using placeholder data.
-  $title = "Placeholder title";
-  $description = "Description blah blah blah";
-  $current_price = 30.50;
-  $num_bids = 1;
-  $end_time = new DateTime('2020-11-02T00:00:00');
+  if (!$auction) {
+    http_response_code(404);
+    echo '<div class="container"><p class="my-4">Auction not found.</p></div>';
+    include_once("footer.php");
+    exit;
+  }
 
-  // TODO: Note: Auctions that have ended may pull a different set of data,
-  //       like whether the auction ended in a sale or was cancelled due
-  //       to lack of high-enough bids. Or maybe not.
-  
+  $title         = $auction['title'];
+  $description   = $auction['description'];
+  $current_price = (float)$auction['currentPrice'];
+  $num_bids      = (int)$auction['numBids'];
+  $end_time      = new DateTime($auction['endTime']);
+  $auction_status = $auction['status'];
+  $winner = $auction_status === 'sold'
+          && $auction['winningAmount'] !== null
+          ? [
+              'amount' => $auction['winningAmount'],
+              'firstName' => $auction['winnerFirstName'],
+              'lastName' => $auction['winnerLastName']
+            ]
+          : null;
+
+  // Record this page view, including anonymous visitors.
+  $view_user_id = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+  if ($view_user_id === null) {
+    $view_stmt = $conn->prepare(
+      "INSERT INTO auction_views (auctionID, userID) VALUES (?, NULL)");
+    $view_stmt->bind_param('i', $item_id);
+  }
+  else {
+    $view_stmt = $conn->prepare(
+      "INSERT INTO auction_views (auctionID, userID) VALUES (?, ?)");
+    $view_stmt->bind_param('ii', $item_id, $view_user_id);
+  }
+  $view_stmt->execute();
+
   // Calculate time to auction end:
   $now = new DateTime();
   
@@ -28,7 +80,6 @@
   
   // You have to login to add auction to watchlist
   // check whether it's already being watched
- require_once("db.php");
   $has_session = $is_buyer;
   $watching    = false;
   if ($has_session) {
@@ -54,14 +105,14 @@
 
 <div class="row"> <!-- Row #1 with auction title + watch button -->
   <div class="col-sm-8"> <!-- Left col -->
-    <h2 class="my-3"><?php echo($title); ?></h2>
+    <h2 class="my-3"><?php echo htmlspecialchars($title); ?></h2>
     <?php if ($seller): ?>
     <p class="text-muted">
       Seller:
       <a href="user_profile.php?user_id=<?= $seller_id ?>"><?= htmlspecialchars($seller['firstName'] . ' ' . $seller['lastName']) ?></a>
       &middot;
       <?php if ($seller_rating['numRatings'] > 0): ?>
-                <a href="user_profile.php?user_id=<?= $seller_id ?>"><?= $seller_rating['avgScore'] ?>/5 (<?= $seller_rating['numRatings'] ?> <?= $seller_rating['numRatings'] == 1 ? 'rating' : 'ratings' ?>)</a>
+                <a href="user_profile.php?user_id=<?= $seller_id ?>"><?= $seller_rating['avgScore'] ?>/5.0 (<?= $seller_rating['numRatings'] ?> <?= $seller_rating['numRatings'] == 1 ? 'rating' : 'ratings' ?>)</a>
       <?php else: ?>
         no ratings yet
       <?php endif; ?>
@@ -89,7 +140,7 @@
   <div class="col-sm-8"> <!-- Left col with item info -->
 
     <div class="itemDescription">
-    <?php echo($description); ?>
+    <?php echo htmlspecialchars($description); ?>
     </div>
 
   </div>
@@ -99,7 +150,11 @@
     <p>
 <?php if ($now > $end_time): ?>
      This auction ended <?php echo(date_format($end_time, 'j M H:i')) ?>
-     <!-- TODO: Print the result of the auction here? -->
+      <?php if ($auction_status === 'sold' && $winner): ?>
+        <p class="text-success">Sold for £<?= number_format((float)$winner['amount'], 2) ?>.</p>
+      <?php else: ?>
+        <p class="text-muted">This auction ended without a sale.</p>
+      <?php endif; ?>
       <?php if ($can_feedback): ?>
        <p><a class="btn btn-outline-primary btn-sm" href="feedback_form.php?auction_id=<?= $auction_id_int ?>">Leave feedback</a></p>
      <?php endif; ?>
@@ -109,11 +164,14 @@
 
     <!-- Bidding form -->
     <form method="POST" action="place_bid.php">
+      <input type="hidden" name="auction_id" value="<?= $item_id ?>">
       <div class="input-group">
         <div class="input-group-prepend">
           <span class="input-group-text">£</span>
         </div>
-	    <input type="number" class="form-control" id="bid">
+	    <input type="number" class="form-control" id="bid" name="amount"
+	           min="<?= number_format($num_bids > 0 ? $current_price + 0.01 : (float)$auction['startingPrice'], 2, '.', '') ?>"
+	           step="0.01" data-money-input required>
       </div>
       <button type="submit" class="btn btn-primary form-control">Place bid</button>
     </form>
@@ -130,6 +188,15 @@
 
 
 <script> 
+document.querySelectorAll('[data-money-input]').forEach(function (input) {
+  input.addEventListener('input', function () {
+    var parts = input.value.split('.');
+    if (parts.length > 1) {
+      input.value = parts[0] + '.' + parts[1].slice(0, 2);
+    }
+  });
+});
+
 // JavaScript functions: addToWatchlist and removeFromWatchlist.
 
 function addToWatchlist(button) {
