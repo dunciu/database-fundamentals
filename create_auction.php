@@ -9,13 +9,13 @@ if ($categories === false) {
 ?>
 
 <?php
-/* (Uncomment this block to redirect people without selling privileges away from this page)
-  // If user is not logged in or not a seller, they should not be able to
-  // use this page.
-  if (!isset($_SESSION['account_type']) || $_SESSION['account_type'] != 'seller') {
-    header('Location: browse.php');
+  // Only logged-in sellers can create auctions. ($is_seller comes from header.php,
+  // which has already printed the page top, so show a message instead of redirecting.)
+  if (!$is_seller) {
+    echo '<div class="container my-4"><p class="text-danger">You need to be logged in with a seller account to create an auction.</p></div>';
+    include_once("footer.php");
+    exit;
   }
-*/
 ?>
 
 <div class="container">

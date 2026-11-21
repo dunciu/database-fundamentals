@@ -6,6 +6,12 @@
   $logged_in = !empty($_SESSION['logged_in']);
   $is_buyer  = $logged_in && !empty($_SESSION['is_buyer']);
   $is_seller = $logged_in && !empty($_SESSION['is_seller']);
+
+  // Close any auctions whose end time has passed (award the item, notify the
+  // winner and seller) before the page shows anything.
+  require_once __DIR__ . '/db.php';
+  require_once __DIR__ . '/auction_functions.php';
+  close_expired_auctions($conn);
 ?>
 
 

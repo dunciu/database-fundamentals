@@ -18,6 +18,7 @@
     'pricehigh' => 'currentPrice DESC, a.endTime ASC',
     'date'      => 'a.endTime ASC',
     'newest'    => 'a.startTime DESC',
+    'popular'   => '(SELECT COUNT(*) FROM auction_views v WHERE v.auctionID = a.auctionID) DESC, a.endTime ASC',
   ];
   if (!isset($orderings[$ordering])) {
     $ordering = 'pricelow';
@@ -69,6 +70,7 @@
           <option value="pricehigh" <?= $ordering === 'pricehigh' ? 'selected' : '' ?>>Price (high to low)</option>
           <option value="date"      <?= $ordering === 'date'      ? 'selected' : '' ?>>Soonest expiry</option>
           <option value="newest"    <?= $ordering === 'newest'    ? 'selected' : '' ?>>Newly listed</option>
+          <option value="popular"   <?= $ordering === 'popular'   ? 'selected' : '' ?>>Most viewed</option>
         </select>
       </div>
     </div>

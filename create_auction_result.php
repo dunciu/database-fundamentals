@@ -9,22 +9,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('<div class="text-center text-danger">Invalid request.</div>');
 }
 
-// TESTING ONLY: use the logged-in user when available; otherwise assign the
-// auction to the first seller in the database until login is implemented.
-if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
-    $seller_id = (int)$_SESSION['user_id'];
-} else {
-    $seller_result = $conn->query(
-        'SELECT userID FROM users WHERE isSeller = TRUE ORDER BY userID LIMIT 1'
-    );
-    if ($seller_result === false) {
-        exit('<div class="text-center text-danger">Unable to find a seller account.</div>');
-    }
-    $seller = $seller_result->fetch_assoc();
-    if (!$seller) {
-        exit('<div class="text-center text-danger">No seller account is available for this auction.</div>');
-    }
-    $seller_id = (int)$seller['userID'];
+// Only logged-in sellers can create auctions. Check the role in the database,
+// not just the session, in case it has changed since they logged in.
+if (!$logged_in) {
+    exit('<div class="text-center text-danger">Please log in to create an auction.</div>');
+}
+$seller_id = (int)$_SESSION['user_id'];
+$stmt = $conn->prepare('SELECT isSeller FROM users WHERE userID = ?');
+$stmt->bind_param('i', $seller_id);
+$stmt->execute();
+$seller = $stmt->get_result()->fetch_assoc();
+if (!$seller || !$seller['isSeller']) {
+    exit('<div class="text-center text-danger">Only seller accounts can create auctions.</div>');
 }
 
 function post_value($key) {
@@ -35,7 +31,6 @@ function is_money_value($value) {
     return preg_match('/^\d+(?:\.\d{1,2})?$/D', $value) === 1;
 }
 
-//$seller_id = (int)$_SESSION['user_id']; original code, commented for testing
 $title = post_value('title');
 $description = post_value('description');
 $category_id = filter_var($_POST['category_id'] ?? null, FILTER_VALIDATE_INT);
@@ -60,6 +55,14 @@ if ($title === '' || strlen($title) > 100 ||
     exit('<div class="text-center text-danger">Please provide valid auction details. The reserve price must be at least the starting price.</div>');
 }
 
+// The category must be one that exists (otherwise the foreign key would fail).
+$stmt = $conn->prepare('SELECT 1 FROM categories WHERE categoryID = ?');
+$stmt->bind_param('i', $category_id);
+$stmt->execute();
+if ($stmt->get_result()->num_rows === 0) {
+    exit('<div class="text-center text-danger">Please choose a valid category.</div>');
+}
+
 $sql = 'INSERT INTO auctions
         (sellerID, categoryID, title, description, itemCondition,
          startingPrice, reservePrice, endTime)
@@ -79,7 +82,7 @@ $stmt->bind_param(
 $stmt->execute();
 $auction_id = $conn->insert_id;
 
-echo('<div class="text-center">Auction successfully created! <a href="listing.php?auction_id=' .
+echo('<div class="text-center">Auction successfully created! <a href="listing.php?item_id=' .
      $auction_id . '">View your new listing.</a></div>');
 
 
