@@ -1,5 +1,10 @@
 <?php
 
+// Ensure numerical, at most 2 d.p
+function is_money_value($value) {
+  return preg_match('/^\d+(?:\.\d{1,2})?$/D', trim((string)$value)) === 1;
+}
+
 // display_time_remaining:
 // Helper function to help figure out what time to display
 function display_time_remaining($interval) {

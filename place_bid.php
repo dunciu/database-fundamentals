@@ -4,6 +4,7 @@
 // Nothing is printed here: the result is shown on listing.php via $_SESSION.
 session_start();
 require_once 'bid_functions.php';
+require_once 'utilities.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: browse.php');
@@ -41,7 +42,7 @@ if (!$user || !$user['isBuyer']) {
 
 // ---- Gate 2: is it a real amount? ----------------------------------------
 // The form has min/required, but anyone can send a POST without the form.
-if (!is_numeric($amount) || (float)$amount <= 0) {
+if (!is_money_value($amount) || (float)$amount <= 0) {
     reject($conn, 'Enter your bid in pounds, for example 12.50.', $back);
 }
 $amount = round((float)$amount, 2);

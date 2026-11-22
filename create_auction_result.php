@@ -4,6 +4,7 @@
 
 <?php
 require_once("db.php");
+require_once("utilities.php");
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('<div class="text-center text-danger">Invalid request.</div>');
@@ -27,9 +28,7 @@ function post_value($key) {
     return trim($_POST[$key] ?? '');
 }
 
-function is_money_value($value) {
-    return preg_match('/^\d+(?:\.\d{1,2})?$/D', $value) === 1;
-}
+
 
 $title = post_value('title');
 $description = post_value('description');
