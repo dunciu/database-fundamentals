@@ -79,8 +79,11 @@ if ($logged_in) {
   echo('
 	<li class="nav-item mx-1">
       <a class="nav-link" href="notifications.php">Notifications</a>
+    </li>
+	<li class="nav-item mx-1">
+      <a class="nav-link" href="activity.php">My activity</a>
     </li>');
-  }
+}
 
   if ($is_seller) {
   echo('
