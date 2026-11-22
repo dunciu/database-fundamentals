@@ -13,15 +13,23 @@ if (!$logged_in) {
 
 $user_id = (int)$_SESSION['user_id'];
 
-// Each notification with its auction, and the bid that triggered it (if any)
+// Notifications live in two tables (bid_notifications and auction_notifications),
+// so UNION ALL combines them. Each row gets its auction, plus an amount:
+// the triggering bid for newBid/outbid, the winning bid for auctionWon/auctionEnded
 $stmt = $conn->prepare(
-  "SELECT n.type, n.sentAt, a.auctionID, a.title, a.status, b.amount
-   FROM notifications n
-   JOIN auctions a  ON a.auctionID = n.auctionID
-   LEFT JOIN bids b ON b.bidID = n.bidID
-   WHERE n.userID = ?
-   ORDER BY n.sentAt DESC, n.notificationID DESC");
-$stmt->bind_param('i', $user_id);
+  "SELECT bn.type, bn.sentAt, a.auctionID, a.title, a.status, b.amount
+   FROM bid_notifications bn
+   JOIN bids b     ON b.bidID = bn.bidID
+   JOIN auctions a ON a.auctionID = b.auctionID
+   WHERE bn.userID = ?
+   UNION ALL
+   SELECT an.type, an.sentAt, a.auctionID, a.title, a.status, w.amount
+   FROM auction_notifications an
+   JOIN auctions a  ON a.auctionID = an.auctionID
+   LEFT JOIN bids w ON w.bidID = a.winningBidID
+   WHERE an.userID = ?
+   ORDER BY sentAt DESC");
+$stmt->bind_param('ii', $user_id, $user_id);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 

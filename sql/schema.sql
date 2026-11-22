@@ -6,6 +6,8 @@ CREATE DATABASE IF NOT EXISTS auction
 USE auction;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS bid_notifications;
+DROP TABLE IF EXISTS auction_notifications;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS feedback;
 DROP TABLE IF EXISTS auction_views;
@@ -114,18 +116,29 @@ CREATE TABLE feedback (
 ) ENGINE=InnoDB;
 
 
-CREATE TABLE notifications (
+CREATE TABLE bid_notifications (
+  notificationID  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  userID          INT UNSIGNED NOT NULL,
+  bidID           INT UNSIGNED NOT NULL,
+  type            ENUM('newBid', 'outbid') NOT NULL,
+  sentAt          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (notificationID),
+  CONSTRAINT fk_bid_notifications_user FOREIGN KEY (userID) REFERENCES users (userID),
+  CONSTRAINT fk_bid_notifications_bid  FOREIGN KEY (bidID)  REFERENCES bids (bidID)
+) ENGINE=InnoDB;
+
+
+CREATE TABLE auction_notifications (
   notificationID  INT UNSIGNED NOT NULL AUTO_INCREMENT,
   userID          INT UNSIGNED NOT NULL,
   auctionID       INT UNSIGNED NOT NULL,
-  type            ENUM('auctionWon', 'auctionEnded', 'newBid', 'outbid') NOT NULL,
-  bidID           INT UNSIGNED NULL,
+  type            ENUM('auctionWon', 'auctionEnded') NOT NULL,
   sentAt          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (notificationID),
-  CONSTRAINT fk_notifications_user    FOREIGN KEY (userID)    REFERENCES users (userID),
-  CONSTRAINT fk_notifications_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID),
-  CONSTRAINT fk_notifications_bid     FOREIGN KEY (bidID, auctionID) REFERENCES bids (bidID, auctionID)
+  CONSTRAINT fk_auction_notifications_user    FOREIGN KEY (userID)    REFERENCES users (userID),
+  CONSTRAINT fk_auction_notifications_auction FOREIGN KEY (auctionID) REFERENCES auctions (auctionID)
 ) ENGINE=InnoDB;
+
 
 ALTER TABLE auctions
   ADD CONSTRAINT fk_auctions_winning_bid
