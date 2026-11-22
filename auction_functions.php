@@ -114,6 +114,17 @@ function get_winning_bid($conn, $auction_id) {
 
 // Records that someone opened an auction's page (userID is null for guests).
 function record_auction_view($conn, $auction_id, $user_id) {
+    if ($user_id !== null) {
+        $seller_stmt = $conn->prepare("SELECT sellerID FROM auctions WHERE auctionID = ?");
+        $seller_stmt->bind_param('i', $auction_id);
+        $seller_stmt->execute();
+        $seller = $seller_stmt->get_result()->fetch_assoc();
+
+        if ($seller && (int)$seller['sellerID'] === (int)$user_id) {
+            return;
+        }
+    }
+
     $stmt = $conn->prepare("INSERT INTO auction_views (auctionID, userID) VALUES (?, ?)");
     $stmt->bind_param('ii', $auction_id, $user_id);
     $stmt->execute();
