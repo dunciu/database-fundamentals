@@ -72,10 +72,10 @@ function close_expired_auctions($conn) {
                 $stmt->execute();
 
                 $stmt = $conn->prepare(
-                    "INSERT INTO notifications (userID, auctionID, type, bidID)
-                     VALUES (?, ?, 'auctionWon', ?), (?, ?, 'auctionEnded', ?)");
-                $stmt->bind_param('iiiiii', $winner_id, $auction_id, $bid_id,
-                                            $seller_id, $auction_id, $bid_id);
+                    "INSERT INTO auction_notifications (userID, auctionID, type)
+                     VALUES (?, ?, 'auctionWon'), (?, ?, 'auctionEnded')");
+                $stmt->bind_param('iiii', $winner_id, $auction_id,
+                                          $seller_id, $auction_id);
                 $stmt->execute();
             } else {
                 $stmt = $conn->prepare(
@@ -84,7 +84,7 @@ function close_expired_auctions($conn) {
                 $stmt->execute();
 
                 $stmt = $conn->prepare(
-                    "INSERT INTO notifications (userID, auctionID, type) VALUES (?, ?, 'auctionEnded')");
+                    "INSERT INTO auction_notifications (userID, auctionID, type) VALUES (?, ?, 'auctionEnded')");
                 $stmt->bind_param('ii', $seller_id, $auction_id);
                 $stmt->execute();
             }

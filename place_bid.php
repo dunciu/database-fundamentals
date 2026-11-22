@@ -102,15 +102,15 @@ $bid_id = (int)$conn->insert_id;   // the new bid's ID, stored on its notificati
 if ($top !== null && (int)$top['buyerID'] !== $user_id) {
     $previous_leader = (int)$top['buyerID'];
     $stmt = $conn->prepare(
-        "INSERT INTO notifications (userID, auctionID, type, bidID) VALUES (?, ?, 'outbid', ?)");
-    $stmt->bind_param('iii', $previous_leader, $auction_id, $bid_id);
+        "INSERT INTO bid_notifications (userID, bidID, type) VALUES (?, ?, 'outbid')");
+    $stmt->bind_param('ii', $previous_leader, $bid_id);
     $stmt->execute();
 }
 
 // Tell everyone watching this auction, except the bidder, that there's a new bid.
 $stmt = $conn->prepare(
-    "INSERT INTO notifications (userID, auctionID, type, bidID)
-     SELECT buyerID, auctionID, 'newBid', ?
+    "INSERT INTO bid_notifications (userID, bidID, type)
+     SELECT buyerID, ?, 'newBid'
      FROM watches
      WHERE auctionID = ? AND buyerID <> ?");
 $stmt->bind_param('iii', $bid_id, $auction_id, $user_id);
