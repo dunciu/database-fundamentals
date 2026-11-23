@@ -1,3 +1,4 @@
 .DS_Store
 db_config.php
 dev_login.php
+smtp_config.php

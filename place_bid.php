@@ -5,6 +5,7 @@
 session_start();
 require_once 'bid_functions.php';
 require_once 'utilities.php';
+require_once 'mail_notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: browse.php');
@@ -60,7 +61,7 @@ $conn->begin_transaction();
 // and also requires status = 'active' (it becomes 'sold' or 'unsold' once
 // the auction has been closed).
 $stmt = $conn->prepare(
-    "SELECT sellerID, startingPrice,
+    "SELECT sellerID, title, startingPrice,
             (status = 'active' AND NOW() >= startTime AND NOW() < endTime) AS isOpen
      FROM auctions
      WHERE auctionID = ?
@@ -115,8 +116,34 @@ $stmt = $conn->prepare(
      WHERE auctionID = ? AND buyerID <> ?");
 $stmt->bind_param('iii', $bid_id, $auction_id, $user_id);
 $stmt->execute();
+$stmt = $conn->prepare(
+    "SELECT buyerID FROM watches WHERE auctionID = ? AND buyerID <> ?"
+);
+$stmt->bind_param('ii', $auction_id, $user_id);
+$stmt->execute();
+$watchers_result = $stmt->get_result();
+$watchers = $watchers_result ? $watchers_result->fetch_all(MYSQLI_ASSOC) : [];
 
 $conn->commit();
+
+if ($top !== null && (int)$top['buyerID'] !== $user_id) {
+    send_user_notification_email(
+        $conn,
+        $previous_leader,
+        'You have been outbid on ' . $auction['title'],
+        'You have been outbid on "' . $auction['title'] . '". ' .
+        'The highest bid is now £' . number_format($amount, 2) . '.'
+    );
+}
+foreach ($watchers as $watcher) {
+    send_user_notification_email(
+        $conn,
+        (int)$watcher['buyerID'],
+        'New bid on ' . $auction['title'],
+        'A new bid of £' . number_format($amount, 2) . ' was placed on "' .
+        $auction['title'] . '".'
+    );
+}
 
 $_SESSION['bid_message'] = 'Bid placed: £' . number_format($amount, 2) . '. You are the highest bidder.';
 $_SESSION['bid_ok']      = true;

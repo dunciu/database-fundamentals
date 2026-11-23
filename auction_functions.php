@@ -1,6 +1,7 @@
 <?php
 // auction_functions.php: implemenation of general auction queries.
 require_once 'db.php';
+require_once __DIR__ . '/mail_notifications.php';
 // Returns the winning buyer's userID, or null if the auction ongoingg
 // The winner is decided when the auction is closed and stored in winningBidID.
 function get_auction_winner($conn, $auction_id) {
@@ -48,6 +49,7 @@ function close_expired_auctions($conn) {
     require_once __DIR__ . '/bid_functions.php';
     try {
         $conn->begin_transaction();
+        $mail_events = [];
 
         $stmt = $conn->prepare(
             "SELECT auctionID, sellerID, reservePrice
@@ -61,6 +63,11 @@ function close_expired_auctions($conn) {
             $auction_id = (int)$a['auctionID'];
             $seller_id  = (int)$a['sellerID'];
             $top        = get_highest_bid($conn, $auction_id);
+            $title_stmt = $conn->prepare("SELECT title FROM auctions WHERE auctionID = ?");
+            $title_stmt->bind_param('i', $auction_id);
+            $title_stmt->execute();
+            $title_row = $title_stmt->get_result()->fetch_assoc();
+            $title = $title_row['title'] ?? 'Auction';
 
             if ($top !== null && (float)$top['amount'] >= (float)$a['reservePrice']) {
                 $bid_id   = (int)$top['bidID'];
@@ -77,6 +84,18 @@ function close_expired_auctions($conn) {
                 $stmt->bind_param('iiii', $winner_id, $auction_id,
                                           $seller_id, $auction_id);
                 $stmt->execute();
+                $mail_events[] = [
+                    'user_id' => $winner_id,
+                    'subject' => 'You won: ' . $title,
+                    'message' => 'You won "' . $title . '". ' .
+                                 'The winning bid was £' . number_format((float)$top['amount'], 2) . '.'
+                ];
+                $mail_events[] = [
+                    'user_id' => $seller_id,
+                    'subject' => 'Your auction sold: ' . $title,
+                    'message' => 'Your auction "' . $title . '" has ended and sold for £' .
+                                 number_format((float)$top['amount'], 2) . '.'
+                ];
             } else {
                 $stmt = $conn->prepare(
                     "UPDATE auctions SET status = 'unsold' WHERE auctionID = ?");
@@ -87,10 +106,23 @@ function close_expired_auctions($conn) {
                     "INSERT INTO auction_notifications (userID, auctionID, type) VALUES (?, ?, 'auctionEnded')");
                 $stmt->bind_param('ii', $seller_id, $auction_id);
                 $stmt->execute();
+                $mail_events[] = [
+                    'user_id' => $seller_id,
+                    'subject' => 'Auction ended: ' . $title,
+                    'message' => 'The auction "' . $title . '" has ended without a sale.'
+                ];
             }
         }
 
         $conn->commit();
+        foreach ($mail_events as $event) {
+            send_user_notification_email(
+                $conn,
+                $event['user_id'],
+                $event['subject'],
+                $event['message']
+            );
+        }
     } catch (Throwable $e) {
         // Never break the page over this; the next page load will try again.
         $conn->rollback();
